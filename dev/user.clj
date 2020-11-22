@@ -1,5 +1,6 @@
 (ns user)
 
+;; Break out your mainframe and let's get to banking!
 (comment
 
   (require '[next.jdbc :as jdbc])
@@ -221,5 +222,1587 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;                :BALANCE 48,
 ;;                :DATE_OPENED #inst "2020-11-22T15:39:10.304090000-00:00"}]
 
+  (defn list-accounts []
+    (execute! "SELECT * FROM accounts"))
+;; => #'user/list-accounts
+
+  (list-accounts)
+;; => [#:ACCOUNTS{:ID "6412469",
+;;                :ACCOUNT_HOLDER "Ashley",
+;;                :BALANCE -48,
+;;                :DATE_OPENED #inst "2020-11-22T15:39:07.122688000-00:00"}
+;;     #:ACCOUNTS{:ID "2983099",
+;;                :ACCOUNT_HOLDER "Kim",
+;;                :BALANCE 48,
+;;                :DATE_OPENED #inst "2020-11-22T15:39:10.304090000-00:00"}]
+
+  (defn list-transactions [account-number]
+    (execute! ["SELECT * FROM transactions WHERE account_id = ? ORDER BY `date` DESC"
+               account-number]))
+;; => #'user/list-transactions
+
+  (list-transactions ashley-id)
+;; => [#:TRANSACTIONS{:ID "93292511-1fc1-4e6a-99e9-797a41b30a57",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -5,
+;;                    :DATE #inst "2020-11-22T15:48:53.925361000-00:00"}
+;;     #:TRANSACTIONS{:ID "bc8fc12a-c8f5-4a2f-a8f4-84ee272a135c",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -2,
+;;                    :DATE #inst "2020-11-22T15:48:53.907486000-00:00"}
+;;     #:TRANSACTIONS{:ID "406cfdba-ecbe-413c-a337-f92fe298273a",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 3,
+;;                    :DATE #inst "2020-11-22T15:48:53.889569000-00:00"}
+;;     #:TRANSACTIONS{:ID "ae57f920-d478-4ef5-bf8a-a39020469412",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -3,
+;;                    :DATE #inst "2020-11-22T15:48:53.888422000-00:00"}
+;;     #:TRANSACTIONS{:ID "2621bb94-e152-4ab0-a484-707af6d16d05",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 2,
+;;                    :DATE #inst "2020-11-22T15:48:53.878485000-00:00"}
+;;     #:TRANSACTIONS{:ID "9d8319b8-f673-4980-8861-27b5de149012",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -2,
+;;                    :DATE #inst "2020-11-22T15:48:53.876334000-00:00"}
+;;     #:TRANSACTIONS{:ID "93697e03-0f41-4e3a-82c6-aa04fe29e303",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 1,
+;;                    :DATE #inst "2020-11-22T15:48:53.867708000-00:00"}
+;;     #:TRANSACTIONS{:ID "47b61e3f-0ae6-4cd6-880e-c9083059065b",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -1,
+;;                    :DATE #inst "2020-11-22T15:48:53.865700000-00:00"}
+;;     #:TRANSACTIONS{:ID "fc9b62a6-ce29-4bdc-8525-2f5ac0b2fdc3",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 3,
+;;                    :DATE #inst "2020-11-22T15:48:53.855628000-00:00"}
+;;     #:TRANSACTIONS{:ID "b3ea48d9-2a37-4ad1-b27f-40aeac3c5266",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -3,
+;;                    :DATE #inst "2020-11-22T15:48:53.854312000-00:00"}
+;;     #:TRANSACTIONS{:ID "a5361e68-4801-4be2-a5a4-0dc5fddfe52d",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 2,
+;;                    :DATE #inst "2020-11-22T15:48:53.817829000-00:00"}
+;;     #:TRANSACTIONS{:ID "dd419a87-550c-4d58-9322-d75520981b1d",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -2,
+;;                    :DATE #inst "2020-11-22T15:48:53.813769000-00:00"}
+;;     #:TRANSACTIONS{:ID "4d4d7330-f111-40c8-b9bd-61716f31cf82",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT 1,
+;;                    :DATE #inst "2020-11-22T15:48:53.777892000-00:00"}
+;;     #:TRANSACTIONS{:ID "70bbb213-57a5-4ca3-ad27-e207a90f8e63",
+;;                    :ACCOUNT_ID "6412469",
+;;                    :AMOUNT -42,
+;;                    :DATE #inst "2020-11-22T15:43:23.463966000-00:00"}]
+
+  (defn get-balance [account-number]
+    (->> (execute-one! ["SELECT balance FROM accounts WHERE id = ?"
+                        account-number])
+         :ACCOUNTS/BALANCE))
+;; => #'user/get-balance
+
+  (get-balance ashley-id)
+;; => -48
+
+  (defn get-balance
+    ([account-number]
+    (->> (execute-one! ["SELECT balance FROM accounts WHERE id = ?"
+                        account-number])
+         :ACCOUNTS/BALANCE))
+
+    ([account-number as-of-date]
+     :???))
+
+  ;; Also, what if another transfer happens at the same time?
+
+  )
+
+;; The functional way!
+(comment
+
+  (def accounts (atom {}))
+;; => #'user/accounts
+
+  (def ledger (atom []))
+;; => #'user/ledger
+
+  (import '(java.time Instant))
+;; => java.time.Instant  
+
+  (str (Instant/now))
+;; => "2020-11-22T16:08:47.240299Z"
+
+  (defn now []
+    (str (Instant/now)))
+;; => #'user/now  
+
+  (defn create-account [account-holder]
+    (let [account {:id (new-account-number)
+                   :account-holder account-holder
+                   :date-opened (now)}]
+      (swap! accounts assoc (:id account) account)))
+;; => #'user/create-account
+
+  (create-account "Ashley")
+;; => {"7295776" "Ashley",
+;;     "8380288"
+;;     {:id "8380288",
+;;      :account-holder "Ashley",
+;;      :date-opened "2020-11-22T16:09:49.737288Z"}}
+
+  (create-account "Kim")
+;; => {"7295776" "Ashley",
+;;     "8380288"
+;;     {:id "8380288",
+;;      :account-holder "Ashley",
+;;      :date-opened "2020-11-22T16:09:49.737288Z"},
+;;     "6489301"
+;;     {:id "6489301",
+;;      :account-holder "Kim",
+;;      :date-opened "2020-11-22T16:10:04.948452Z"}}  
+
+  (defn get-account-number [account-holder]
+    (->> @accounts
+         (some (fn [[id account]]
+                 (= account-holder (:account-holder account))))))
+;; => #'user/get-account-number
+
+  (get-account-number "Kim")
+;; => true
+
+  (defn get-account-number [account-holder]
+    (->> @accounts
+         (some (fn [[id account]]
+                 (and (= account-holder (:account-holder account))
+                      id)))))
+;; => #'user/get-account-number
+
+  (get-account-number "Kim")
+;; => "6489301"
+
+  (def kim-id (get-account-number "Kim"))
+;; => #'user/kim-id
+
+  (def ashley-id (get-account-number "Ashley"))
+;; => #'user/ashley-id
+
+  ashley-id
+;; => "8380288"
+
+  (defn execute-credit-transfer [debit-account credit-account amount]
+    (let [tx {:id (uuid)
+              :debit-account debit-account
+              :credit-account credit-account
+              :amount amount
+              :date (now)}]
+      (swap! ledger conj tx)
+      tx))
+;; => #'user/execute-credit-transfer
+
+  (execute-credit-transfer ashley-id kim-id 42)
+;; => [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;      :debit-account "8380288",
+;;      :credit-account "6489301",
+;;      :amount 42,
+;;      :date "2020-11-22T16:16:58.172085Z"}]
+
+  (defn list-transactions [account-number]
+    (->> @ledger
+         (filter (fn [{:keys [debit-account credit-account] :as tx}]
+                   (or (= account-number debit-account)
+                       (= account-number credit-account))))))
+;; => #'user/list-transactions
+
+  (list-transactions ashley-id)
+;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;      :debit-account "8380288",
+;;      :credit-account "6489301",
+;;      :amount 42,
+;;      :date "2020-11-22T16:16:58.172085Z"})
+
+  (defn list-transactions [account-number]
+    (->> @ledger
+         (filter (fn [{:keys [debit-account credit-account] :as tx}]
+                   (or (= account-number debit-account)
+                       (= account-number credit-account))))
+         (map (fn [{:keys [debit-account credit-account amount] :as tx}]
+                (-> (select-keys tx [:id :date])
+                    (assoc :amount (if (= account-number debit-account)
+                                     (* amount -1)
+                                     amount)))))))
+;; => #'user/list-transactions
+
+  (list-transactions ashley-id)
+;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;      :date "2020-11-22T16:16:58.172085Z",
+;;      :amount -42})
+
+  (s/def :account/id #{ashley-id kim-id})
+;; => :account/id
+
+  (s/exercise-fn `execute-credit-transfer)
+;; => ([("6489301" "6489301" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}]]
+;;     [("8380288" "6489301" 1)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}]]
+;;     [("8380288" "6489301" 1)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}]]
+;;     [("6489301" "8380288" 4)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}]]
+;;     [("6489301" "8380288" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}]]
+;;     [("8380288" "8380288" 5)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}]]
+;;     [("8380288" "8380288" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}]]
+;;     [("6489301" "6489301" 6)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}]]
+;;     [("8380288" "8380288" 1)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}]]
+;;     [("6489301" "6489301" 74)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}]])
+
+  (list-transactions ashley-id)
+;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;      :date "2020-11-22T16:16:58.172085Z",
+;;      :amount -42}
+;;     {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;      :date "2020-11-22T16:26:14.113794Z",
+;;      :amount -1}
+;;     {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;      :date "2020-11-22T16:26:14.161013Z",
+;;      :amount -1}
+;;     {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;      :date "2020-11-22T16:26:14.187429Z",
+;;      :amount 4}
+;;     {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;      :date "2020-11-22T16:26:14.224974Z",
+;;      :amount 2}
+;;     {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;      :date "2020-11-22T16:26:14.257782Z",
+;;      :amount -5}
+;;     {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;      :date "2020-11-22T16:26:14.304439Z",
+;;      :amount -2}
+;;     {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;      :date "2020-11-22T16:26:14.380766Z",
+;;      :amount -1})  
+
+  (create-account "Sam")
+;; => {"7295776" "Ashley",
+;;     "8380288"
+;;     {:id "8380288",
+;;      :account-holder "Ashley",
+;;      :date-opened "2020-11-22T16:09:49.737288Z"},
+;;     "6489301"
+;;     {:id "6489301",
+;;      :account-holder "Kim",
+;;      :date-opened "2020-11-22T16:10:04.948452Z"},
+;;     "3250090"
+;;     {:id "3250090",
+;;      :account-holder "Sam",
+;;      :date-opened "2020-11-22T16:27:44.661525Z"}}
+
+  (def sam-id (get-account-number "Sam"))
+;; => #'user/sam-id
+
+  (s/def :account/id #{ashley-id kim-id sam-id})
+;; => :account/id  
+
+  (s/exercise-fn `execute-credit-transfer)
+;; => ([("8380288" "8380288" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}]]
+;;     [("8380288" "6489301" 1)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}]]
+;;     [("6489301" "3250090" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}]]
+;;     [("6489301" "3250090" 1)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}]]
+;;     [("3250090" "8380288" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}]]
+;;     [("6489301" "3250090" 3)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}
+;;       {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 3,
+;;        :date "2020-11-22T16:28:47.638465Z"}]]
+;;     [("8380288" "8380288" 7)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}
+;;       {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 3,
+;;        :date "2020-11-22T16:28:47.638465Z"}
+;;       {:id "9679086d-c347-4da5-9a3c-3795e06211f3",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 7,
+;;        :date "2020-11-22T16:28:47.722154Z"}]]
+;;     [("3250090" "6489301" 5)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}
+;;       {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 3,
+;;        :date "2020-11-22T16:28:47.638465Z"}
+;;       {:id "9679086d-c347-4da5-9a3c-3795e06211f3",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 7,
+;;        :date "2020-11-22T16:28:47.722154Z"}
+;;       {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;        :debit-account "3250090",
+;;        :credit-account "6489301",
+;;        :amount 5,
+;;        :date "2020-11-22T16:28:47.779346Z"}]]
+;;     [("8380288" "6489301" 2)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}
+;;       {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 3,
+;;        :date "2020-11-22T16:28:47.638465Z"}
+;;       {:id "9679086d-c347-4da5-9a3c-3795e06211f3",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 7,
+;;        :date "2020-11-22T16:28:47.722154Z"}
+;;       {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;        :debit-account "3250090",
+;;        :credit-account "6489301",
+;;        :amount 5,
+;;        :date "2020-11-22T16:28:47.779346Z"}
+;;       {:id "817d5ae6-1584-4358-945b-9028b57dbd84",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.889120Z"}]]
+;;     [("3250090" "8380288" 10)
+;;      [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 42,
+;;        :date "2020-11-22T16:16:58.172085Z"}
+;;       {:id "696df266-a05b-4812-9a8e-0a7accc0b860",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.069905Z"}
+;;       {:id "7b6100f3-f7d6-4f8e-9c11-6a462042cc9a",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.113794Z"}
+;;       {:id "c9815bf4-bcd3-4fe3-9c65-256292f48d1e",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.161013Z"}
+;;       {:id "9cd3a166-d550-4657-a14c-c9a4c90b26b4",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 4,
+;;        :date "2020-11-22T16:26:14.187429Z"}
+;;       {:id "8fd55a89-2bb7-4f21-b410-afc8ec816894",
+;;        :debit-account "6489301",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.224974Z"}
+;;       {:id "3ffd9b06-20b5-464f-b1b3-0208240545e6",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 5,
+;;        :date "2020-11-22T16:26:14.257782Z"}
+;;       {:id "40129d53-1f6d-4fe2-950c-95efe6d2b6cb",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:26:14.304439Z"}
+;;       {:id "a704025b-8e06-4cd5-b0fa-e3fc1113c2f9",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 6,
+;;        :date "2020-11-22T16:26:14.338984Z"}
+;;       {:id "09bd2f7a-862a-470d-81f3-a86609110e8f",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 1,
+;;        :date "2020-11-22T16:26:14.380766Z"}
+;;       {:id "4137a788-e0d2-4888-85cd-e05fc1dd5573",
+;;        :debit-account "6489301",
+;;        :credit-account "6489301",
+;;        :amount 74,
+;;        :date "2020-11-22T16:26:14.437684Z"}
+;;       {:id "dd9f5c32-ae02-431a-983d-512e0ffa5cbd",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.315407Z"}
+;;       {:id "3822520c-718f-404a-b8bb-c6d9601ab2c4",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.369507Z"}
+;;       {:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.431042Z"}
+;;       {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 1,
+;;        :date "2020-11-22T16:28:47.502501Z"}
+;;       {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.563273Z"}
+;;       {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;        :debit-account "6489301",
+;;        :credit-account "3250090",
+;;        :amount 3,
+;;        :date "2020-11-22T16:28:47.638465Z"}
+;;       {:id "9679086d-c347-4da5-9a3c-3795e06211f3",
+;;        :debit-account "8380288",
+;;        :credit-account "8380288",
+;;        :amount 7,
+;;        :date "2020-11-22T16:28:47.722154Z"}
+;;       {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;        :debit-account "3250090",
+;;        :credit-account "6489301",
+;;        :amount 5,
+;;        :date "2020-11-22T16:28:47.779346Z"}
+;;       {:id "817d5ae6-1584-4358-945b-9028b57dbd84",
+;;        :debit-account "8380288",
+;;        :credit-account "6489301",
+;;        :amount 2,
+;;        :date "2020-11-22T16:28:47.889120Z"}
+;;       {:id "05ba7993-d376-4d51-a02a-6feedb13c4e3",
+;;        :debit-account "3250090",
+;;        :credit-account "8380288",
+;;        :amount 10,
+;;        :date "2020-11-22T16:28:47.961143Z"}]])  
+
+  (list-transactions sam-id)
+;; => ({:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;      :date "2020-11-22T16:28:47.431042Z",
+;;      :amount 2}
+;;     {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;      :date "2020-11-22T16:28:47.502501Z",
+;;      :amount 1}
+;;     {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;      :date "2020-11-22T16:28:47.563273Z",
+;;      :amount -2}
+;;     {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;      :date "2020-11-22T16:28:47.638465Z",
+;;      :amount 3}
+;;     {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;      :date "2020-11-22T16:28:47.779346Z",
+;;      :amount -5}
+;;     {:id "05ba7993-d376-4d51-a02a-6feedb13c4e3",
+;;      :date "2020-11-22T16:28:47.961143Z",
+;;      :amount -10})
+
+  (defn list-transactions [account-number]
+    (let [xf (comp
+              (filter (fn [{:keys [debit-account credit-account] :as tx}]
+                        (or (= account-number debit-account)
+                            (= account-number credit-account))))
+              (map (fn [{:keys [debit-account credit-account amount] :as tx}]
+                     (-> (select-keys tx [:id :date])
+                         (assoc :amount (if (= account-number debit-account)
+                                          (* amount -1)
+                                          amount))))))]
+      (transduce xf conj @ledger)))
+;; => #'user/list-transactions  
+
+  (list-transactions sam-id)
+;; => [{:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;      :date "2020-11-22T16:28:47.431042Z",
+;;      :amount 2}
+;;     {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;      :date "2020-11-22T16:28:47.502501Z",
+;;      :amount 1}
+;;     {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;      :date "2020-11-22T16:28:47.563273Z",
+;;      :amount -2}
+;;     {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;      :date "2020-11-22T16:28:47.638465Z",
+;;      :amount 3}
+;;     {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;      :date "2020-11-22T16:28:47.779346Z",
+;;      :amount -5}
+;;     {:id "05ba7993-d376-4d51-a02a-6feedb13c4e3",
+;;      :date "2020-11-22T16:28:47.961143Z",
+;;      :amount -10}]
+
+  (defn transaction-lister [account-number]
+    (comp
+     (filter (fn [{:keys [debit-account credit-account] :as tx}]
+               (or (= account-number debit-account)
+                   (= account-number credit-account))))
+     (map (fn [{:keys [debit-account credit-account amount] :as tx}]
+            (-> (select-keys tx [:id :date])
+                (assoc :amount (if (= account-number debit-account)
+                                 (* amount -1)
+                                 amount)))))))
+;; => #'user/transaction-lister  
+
+  (defn list-transactions [account-number]
+    (transduce (transaction-lister account-number) conj @ledger))
+;; => #'user/list-transactions  
+
+  (list-transactions sam-id)
+;; => [{:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
+;;      :date "2020-11-22T16:28:47.431042Z",
+;;      :amount 2}
+;;     {:id "5c141992-3d10-4cc7-af4a-6d8079f218bf",
+;;      :date "2020-11-22T16:28:47.502501Z",
+;;      :amount 1}
+;;     {:id "d5eadbb6-2080-4c83-b3a1-1b970f49006c",
+;;      :date "2020-11-22T16:28:47.563273Z",
+;;      :amount -2}
+;;     {:id "2fc15eb3-cc7d-4cd5-a0a8-7737df15c08a",
+;;      :date "2020-11-22T16:28:47.638465Z",
+;;      :amount 3}
+;;     {:id "356ce0f2-ad53-4703-a514-e53d1610530c",
+;;      :date "2020-11-22T16:28:47.779346Z",
+;;      :amount -5}
+;;     {:id "05ba7993-d376-4d51-a02a-6feedb13c4e3",
+;;      :date "2020-11-22T16:28:47.961143Z",
+;;      :amount -10}]
+
+  (defn get-balance
+    ([account-number]
+     (transduce (comp (transaction-lister account-number)
+                      (map :amount))
+                +
+                @ledger)))
+;; => #'user/get-balance
+
+  (get-balance sam-id)
+;; => -11
+
+  (Instant/parse (now))
+;; => #object[java.time.Instant 0x29372373 "2020-11-22T16:55:13.877055Z"]  
+
+  (.isBefore (Instant/parse "2020-11-22T16:55:13.877055Z") (Instant/parse (now)))
+;; => true  
+
+  (.compareTo (Instant/parse "2020-11-22T16:55:13.877055Z") (Instant/parse (now)))
+;; => -1
+
+  (let [now (Instant/now)]
+    (.compareTo now now))
+;; => 0  
+
+  (defn get-balance
+    ([account-number]
+     (get-balance account-number (now)))
+
+    ([account-number as-of-date]
+     (let [as-of-instant (Instant/parse as-of-date)]
+       (transduce (comp (transaction-lister account-number)
+                        (filter (fn [{:keys [date]}]
+                                  (<= (.compareTo (Instant/parse date) as-of-instant) 0)))
+                        (map :amount))
+                  +
+                  @ledger))))
+;; => #'user/get-balance
+
+  (execute-credit-transfer ashley-id sam-id 42)
+;; => {:id "fa2cfb1b-e633-4784-8599-3a832896c88a",
+;;     :debit-account "8380288",
+;;     :credit-account "3250090",
+;;     :amount 42,
+;;     :date "2020-11-22T17:03:32.299003Z"}
+
+  (get-balance sam-id)
+;; => 115  
+
+  (get-balance sam-id "2020-11-22T17:00:00Z")
+;; => -11  
 
   )
