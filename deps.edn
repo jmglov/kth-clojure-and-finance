@@ -1,0 +1,7 @@
+{:paths ["src" "dev"]
+ :deps {org.clojure/clojure {:mvn/version "1.10.1"}
+        org.clojure/test.check {:mvn/version "1.1.0"}
+        amazonica {:mvn/version "0.3.152"}
+        cheshire {:mvn/version "5.10.0"}
+        com.h2database/h2 {:mvn/version "1.4.199"}
+        seancorfield/next.jdbc {:mvn/version "1.0.424"}}}
