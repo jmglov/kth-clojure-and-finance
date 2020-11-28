@@ -1,4 +1,4 @@
-(ns user)
+(ns kth-clj-finance.local)
 
 ;; Break out your mainframe and let's get to banking!
 (comment
