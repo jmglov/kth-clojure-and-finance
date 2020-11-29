@@ -145,7 +145,7 @@
              :request :account/create-request
              :response :account/account}
       :get {:summary "List accounts"
-            :response :account/accounts}}
+            :response :accounts/list}}
 
      "/accounts/{id}"
      {:get {:summary "Get account info"
@@ -1165,5 +1165,50 @@
 ;; => {:date-opened "2020-11-29T14:51:28.285931Z",
 ;;     :id "9984638",
 ;;     :account-holder "iwo63xpG6mEu7IN7FCK2"}
+
+  (db/list-accounts)
+;; => [{:date-opened "2020-11-29T14:35:18.598211Z",
+;;      :id "9453577",
+;;      :account-holder "g99E9fiId81drC1CtDcg5Olav9x"}
+;;     {:date-opened "2020-11-29T14:28:18.092858Z",
+;;      :id "5368778",
+;;      :account-holder "6WebQ1PT"}
+;;     {:date-opened "2020-11-29T14:51:28.285931Z",
+;;      :id "9984638",
+;;      :account-holder "iwo63xpG6mEu7IN7FCK2"}
+;;     {:date-opened "2020-11-29T14:35:43.137406Z",
+;;      :id "8130445",
+;;      :account-holder "tA9gw"}
+;;     {:date-opened "2020-11-29T14:36:31.229388Z",
+;;      :id "7771557",
+;;      :account-holder "xRlY93lFX"}]
+
+  (deploy-lambda)
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x44b9e299 "2020-11-29T15:58:08.000+01:00"],
+;;     :id "v9b9ll"}
+
+  (-> (http/get (str base-url "/accounts"))
+      :body
+      (json/parse-string true))
+;; => {:accounts
+;;     [{:date-opened "2020-11-29T14:35:18.598211Z",
+;;       :id "9453577",
+;;       :account-holder "g99E9fiId81drC1CtDcg5Olav9x"}
+;;      {:date-opened "2020-11-29T14:28:18.092858Z",
+;;       :id "5368778",
+;;       :account-holder "6WebQ1PT"}
+;;      {:date-opened "2020-11-29T14:51:28.285931Z",
+;;       :id "9984638",
+;;       :account-holder "iwo63xpG6mEu7IN7FCK2"}
+;;      {:date-opened "2020-11-29T14:35:43.137406Z",
+;;       :id "8130445",
+;;       :account-holder "tA9gw"}
+;;      {:date-opened "2020-11-29T14:36:31.229388Z",
+;;       :id "7771557",
+;;       :account-holder "xRlY93lFX"}]}
+
+  (s/valid? :accounts/list *1)
+;; => true
 
   )

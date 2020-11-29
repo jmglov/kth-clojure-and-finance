@@ -23,7 +23,7 @@
     account))
 
 (defn list-accounts [_]
-  {:accounts []})
+  {:accounts (db/list-accounts)})
 
 (defn get-account [{:keys [pathParameters]}]
   (let [{:keys [id]} pathParameters]
