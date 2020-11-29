@@ -1,7 +1,8 @@
 (ns kth-clj-finance.apigw-handler
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
-            [kth-clj-finance.accounts :as accounts])
+            [kth-clj-finance.accounts :as accounts]
+            [kth-clj-finance.db :as db])
   (:gen-class :name apigw-handler
               :main false
               :implements [com.amazonaws.services.lambda.runtime.RequestStreamHandler]))
@@ -17,6 +18,7 @@
   (let [{:keys [account-holder]} body
         _ (log (str "Creating account for: " account-holder))
         account (accounts/create-account account-holder)]
+    (db/put-account account)
     (log "Account created" account)
     account))
 
@@ -25,7 +27,8 @@
 
 (defn get-account [{:keys [pathParameters]}]
   (let [{:keys [id]} pathParameters]
-    {:id id}))
+    (log (str "Getting account id: " id))
+    (db/get-account id)))
 
 (def handlers
   {"/accounts"

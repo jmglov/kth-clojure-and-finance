@@ -1,6 +1,9 @@
 (ns kth-clj-finance.aws
   (:require [clojure.string :as string]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [kth-clj-finance.accounts :as accounts]
+            [amazonica.aws.dynamodbv2 :as dynamo]
+            [kth-clj-finance.db :as db]))
 
 ;; 21st century banking, please!
 (comment
@@ -1025,5 +1028,142 @@
       (json/parse-string true))
 ;; => {:id "1314693"}
 
+  (require '[amazonica.aws.dynamodbv2 :as dynamo])
+;; => nil
+
+  (dynamo/list-tables)
+;; => {:table-names []}
+
+  (dynamo/create-table :table-name "kth-clj-finance"
+                       :attribute-definitions [{:attribute-name "id", :attribute-type "S"}]
+                       :key-schema [{:attribute-name "id", :key-type "HASH"}]
+                       :billing-mode "PAY_PER_REQUEST")
+;; => {:table-description
+;;     {:table-id "d120bd10-4f09-408e-a93c-30b9aee06a37",
+;;      :key-schema [{:key-type "HASH", :attribute-name "id"}],
+;;      :table-size-bytes 0,
+;;      :billing-mode-summary {:billing-mode "PAY_PER_REQUEST"},
+;;      :attribute-definitions [{:attribute-name "id", :attribute-type "S"}],
+;;      :creation-date-time
+;;      #object[org.joda.time.DateTime 0x2b5f714f "2020-11-29T15:16:13.942+01:00"],
+;;      :item-count 0,
+;;      :table-status "CREATING",
+;;      :table-name "kth-clj-finance",
+;;      :provisioned-throughput
+;;      {:read-capacity-units 0,
+;;       :write-capacity-units 0,
+;;       :number-of-decreases-today 0},
+;;      :table-arn "arn:aws:dynamodb:eu-west-1:289341159200:table/kth-clj-finance"}}
+
+  (dynamo/list-tables)
+;; => {:table-names ["kth-clj-finance"]}
+
+  (dynamo/scan :table-name "kth-clj-finance")
+;; => {:items [], :scanned-count 0, :count 0}
+
+  (dynamo/put-item :table-name "kth-clj-finance"
+                   :item (sgen/generate (s/gen :account/account)))
+
+  (sgen/generate (s/gen :account/id))
+
+  (s/def :account/id
+    (s/with-gen
+      (s/and string?
+             (partial re-matches #"[0-9]{7}"))
+      #(sgen/return (accounts/new-account-number))))
+;; => :account/id
+
+  (sgen/generate (s/gen :account/id))
+;; => "2303701"
+
+  (s/def :account/date-opened
+    (s/with-gen
+      (s/and string?
+             (partial re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z"))
+      #(sgen/return (str (Instant/now)))))
+;; => :account/date-opened
+
+  (def generate (comp sgen/generate s/gen))
+;; => #'kth-clj-finance.aws/generate
+
+  (generate :account/account)
+;; => {:id "4923111",
+;;     :account-holder "X81a1E1UYp1217F4w1vW",
+;;     :date-opened "2020-11-29T14:27:07.509479Z"}
+
+  (dynamo/put-item :table-name "kth-clj-finance"
+                   :item (generate :account/account))
+;; => {}
+
+  (dynamo/scan :table-name "kth-clj-finance")
+;; => {:items
+;;     [{:date-opened "2020-11-29T14:28:18.092858Z",
+;;       :id "5368778",
+;;       :account-holder "6WebQ1PT"}],
+;;     :scanned-count 1,
+;;     :count 1}
+
+  (require '[kth-clj-finance.apigw-handler :as handler])
+;; => nil
+
+  (handler/create-account {:body (generate :account/create-request)})
+;; => {:id "8130445",
+;;     :account-holder "tA9gw",
+;;     :date-opened "2020-11-29T14:35:43.137406Z"}
+
+  (dynamo/scan :table-name "kth-clj-finance")
+;; => {:items
+;;     [{:date-opened "2020-11-29T14:35:18.598211Z",
+;;       :id "9453577",
+;;       :account-holder "g99E9fiId81drC1CtDcg5Olav9x"}
+;;      {:date-opened "2020-11-29T14:28:18.092858Z",
+;;       :id "5368778",
+;;       :account-holder "6WebQ1PT"}
+;;      {:date-opened "2020-11-29T14:35:43.137406Z",
+;;       :id "8130445",
+;;       :account-holder "tA9gw"}],
+;;     :scanned-count 3,
+;;     :count 3}
+
+  (dynamo/get-item :table-name "kth-clj-finance"
+                   :key {:id {:s "8130445"}})
+;; => {:item
+;;     {:date-opened "2020-11-29T14:35:43.137406Z",
+;;      :id "8130445",
+;;      :account-holder "tA9gw"}}
+
+  (db/get-account "8130445")
+;; => {:date-opened "2020-11-29T14:35:43.137406Z",
+;;     :id "8130445",
+;;     :account-holder "tA9gw"}
+
+  (deploy-lambda)
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x4ec851b "2020-11-29T15:46:28.000+01:00"],
+;;     :id "bjcv6i"}
+
+  (-> (http/get (str base-url "/accounts/8130445"))
+      :body
+      (json/parse-string true))
+;; => {:date-opened "2020-11-29T14:35:43.137406Z",
+;;     :id "8130445",
+;;     :account-holder "tA9gw"}
+
+  (-> (http/post (str base-url "/accounts")
+                 {:content-type :json
+                  :body (-> (sgen/generate (s/gen :account/create-request))
+                            json/generate-string)})
+      :body
+      (json/parse-string true))
+;; => {:id "9984638",
+;;     :account-holder "iwo63xpG6mEu7IN7FCK2",
+;;     :date-opened "2020-11-29T14:51:28.285931Z"}
+
+  (-> (http/get (str base-url "/accounts/9984638"))
+      :body
+      (json/parse-string true))
+;; => {:date-opened "2020-11-29T14:51:28.285931Z",
+;;     :id "9984638",
+;;     :account-holder "iwo63xpG6mEu7IN7FCK2"}
 
   )
