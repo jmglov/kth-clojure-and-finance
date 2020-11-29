@@ -1313,5 +1313,111 @@
 ;;     :amount 874682,
 ;;     :date "2020-11-29T15:31:46.002351Z"}
 
+  (handler/create-transfer {:pathParameters {:id "9453577"}
+                            :body {:credit-account "8130445"
+                                   :amount 4200}})
+;; => {:id "1a93b13e-3576-450c-bade-eb38b9b6db5e",
+;;     :debit-account "9453577",
+;;     :credit-account "8130445",
+;;     :amount 4200,
+;;     :date "2020-11-29T15:37:08.364037Z"}
+
+  (handler/list-accounts {})
+;; => {:accounts
+;;     [{:date-opened "2020-11-29T14:35:18.598211Z",
+;;       :id "9453577",
+;;       :account-holder "g99E9fiId81drC1CtDcg5Olav9x"}
+;;      {:date-opened "2020-11-29T14:28:18.092858Z",
+;;       :id "5368778",
+;;       :account-holder "6WebQ1PT"}
+;;      {:date "2020-11-29T15:37:08.364037Z",
+;;       :amount 4200,
+;;       :debit-account "9453577",
+;;       :id "TRANSFER:1a93b13e-3576-450c-bade-eb38b9b6db5e",
+;;       :credit-account "8130445"}
+;;      {:date-opened "2020-11-29T14:51:28.285931Z",
+;;       :id "9984638",
+;;       :account-holder "iwo63xpG6mEu7IN7FCK2"}
+;;      {:date-opened "2020-11-29T14:35:43.137406Z",
+;;       :id "8130445",
+;;       :account-holder "tA9gw"}
+;;      {:date-opened "2020-11-29T14:36:31.229388Z",
+;;       :id "7771557",
+;;       :account-holder "xRlY93lFX"}
+;;      {:date "2020-11-29T15:28:11.754935Z",
+;;       :amount 4200,
+;;       :debit-account "9453577",
+;;       :id "9bd39b48-8578-4b32-baab-05054be00f20",
+;;       :credit-account "8130445"}
+;;      {:date "2020-11-29T15:31:46.002351Z",
+;;       :amount 874682,
+;;       :debit-account "9453577",
+;;       :id "cd4581b7-8829-4a6b-b577-510ab8ba1251",
+;;       :credit-account "1806739"}]}
+
+  (->> (range 5)
+       (map (fn [_] (generate :account/create-request)))
+       (map #(handler/create-account {:body %})))
+;; => Creating account for: FzucV1fj
+;;    {"msg":"Account created","data":{"id":"8447824","account-holder":"FzucV1fj","date-opened":"2020-11-29T15:45:26.458461Z"}}
+;;    Creating account for: XW7RgZ
+;;    {"msg":"Account created","data":{"id":"7235070","account-holder":"XW7RgZ","date-opened":"2020-11-29T15:45:26.722964Z"}}
+;;    Creating account for: O5DgS5H1
+;;    {"msg":"Account created","data":{"id":"9419353","account-holder":"O5DgS5H1","date-opened":"2020-11-29T15:45:26.789243Z"}}
+;;    Creating account for: 4NZ7t7ab60wRw
+;;    {"msg":"Account created","data":{"id":"2308349","account-holder":"4NZ7t7ab60wRw","date-opened":"2020-11-29T15:45:26.849187Z"}}
+;;    Creating account for: 3498HO
+;;    {"msg":"Account created","data":{"id":"3316402","account-holder":"3498HO","date-opened":"2020-11-29T15:45:26.903345Z"}}
+;;    ({:id "8447824",
+;;      :account-holder "FzucV1fj",
+;;      :date-opened "2020-11-29T15:45:26.458461Z"}
+;;     {:id "7235070",
+;;      :account-holder "XW7RgZ",
+;;      :date-opened "2020-11-29T15:45:26.722964Z"}
+;;     {:id "9419353",
+;;      :account-holder "O5DgS5H1",
+;;      :date-opened "2020-11-29T15:45:26.789243Z"}
+;;     {:id "2308349",
+;;      :account-holder "4NZ7t7ab60wRw",
+;;      :date-opened "2020-11-29T15:45:26.849187Z"}
+;;     {:id "3316402",
+;;      :account-holder "3498HO",
+;;      :date-opened "2020-11-29T15:45:26.903345Z"})
+
+  (handler/list-accounts {})
+;; => {:accounts
+;;     [{:date-opened "2020-11-29T15:45:26.458461Z",
+;;       :id "ACCOUNT:8447824",
+;;       :account-holder "FzucV1fj"}
+;;      {:date-opened "2020-11-29T15:45:26.849187Z",
+;;       :id "ACCOUNT:2308349",
+;;       :account-holder "4NZ7t7ab60wRw"}
+;;      {:date-opened "2020-11-29T15:45:26.789243Z",
+;;       :id "ACCOUNT:9419353",
+;;       :account-holder "O5DgS5H1"}
+;;      {:date-opened "2020-11-29T15:45:26.903345Z",
+;;       :id "ACCOUNT:3316402",
+;;       :account-holder "3498HO"}
+;;      {:date-opened "2020-11-29T15:45:26.722964Z",
+;;       :id "ACCOUNT:7235070",
+;;       :account-holder "XW7RgZ"}]}
+
+  (handler/list-accounts {})
+;; => {:accounts
+;;     ({:date-opened "2020-11-29T15:45:26.458461Z",
+;;       :id "8447824",
+;;       :account-holder "FzucV1fj"}
+;;      {:date-opened "2020-11-29T15:45:26.849187Z",
+;;       :id "2308349",
+;;       :account-holder "4NZ7t7ab60wRw"}
+;;      {:date-opened "2020-11-29T15:45:26.789243Z",
+;;       :id "9419353",
+;;       :account-holder "O5DgS5H1"}
+;;      {:date-opened "2020-11-29T15:45:26.903345Z",
+;;       :id "3316402",
+;;       :account-holder "3498HO"}
+;;      {:date-opened "2020-11-29T15:45:26.722964Z",
+;;       :id "7235070",
+;;       :account-holder "XW7RgZ"})}
 
   )
