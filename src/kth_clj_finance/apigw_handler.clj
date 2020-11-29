@@ -23,10 +23,16 @@
 (defn list-accounts [_]
   {:accounts []})
 
+(defn get-account [{:keys [pathParameters]}]
+  (let [{:keys [id]} pathParameters]
+    {:id id}))
+
 (def handlers
   {"/accounts"
    {"GET" list-accounts
-    "POST" create-account}})
+    "POST" create-account}
+   "/accounts/{id}"
+   {"GET" get-account}})
 
 (defn parse-body [{:keys [body] :as event}]
   (if body

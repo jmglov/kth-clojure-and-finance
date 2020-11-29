@@ -1015,4 +1015,15 @@
       :body
       (json/parse-string true))
 
+  (deploy-lambda)
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x43b97892 "2020-11-29T15:03:43.000+01:00"],
+;;     :id "h1deh2"}
+
+  (-> (http/get (str base-url "/accounts/1314693"))
+      :body
+      (json/parse-string true))
+;; => {:id "1314693"}
+
+
   )
