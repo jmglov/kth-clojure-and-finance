@@ -1,5 +1,6 @@
 (ns kth-clj-finance.aws
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string]
+            [cheshire.core :as json]))
 
 ;; 21st century banking, please!
 (comment
@@ -27,7 +28,7 @@
   ;; What do we need for an account?
 
   (require '[kth-clj-finance.accounts :as accounts])
-;; => nil  
+;; => nil
 
   (accounts/create-account "Ashley")
 ;; => {:id "6252825",
@@ -37,7 +38,7 @@
   ;; Say it with spec!
 
   (require '[clojure.spec.alpha :as s])
-;; => nil  
+;; => nil
 
   (s/def :account/id (s/and string?
                             (partial re-matches #"[0-9]{7}")))
@@ -91,7 +92,7 @@
      {:post {:summary "Transfer from this account to another"
              :request :???
              :response :???}}})
-;; => #'kth-clj-finance.aws/paths  
+;; => #'kth-clj-finance.aws/paths
 
   (s/def :account/accounts (s/coll-of :account/account))
 ;; => :account/accounts
@@ -153,7 +154,7 @@
              :parameter :account/id
              :request :transfer/request
              :response :transfer/transfer}}})
-;; => #'kth-clj-finance.aws/paths  
+;; => #'kth-clj-finance.aws/paths
 
   (require '[amazonica.core :as amazonica])
 ;; => nil
@@ -164,9 +165,9 @@
 
   (refresh-aws-credentials "jmglov")
 ;; => #object[com.amazonaws.auth.profile.ProfileCredentialsProvider 0x49567a27 "com.amazonaws.auth.profile.ProfileCredentialsProvider@49567a27"]
-  
+
   (require '[amazonica.aws.apigateway :as apigw])
-;; => nil  
+;; => nil
 
   (apigw/get-rest-apis)
 ;; => {:items []}
@@ -174,14 +175,14 @@
   ;; OpenAPI 3 allows us to describe an API with data!
 
   (require '[kth-clj-finance.openapi :as openapi])
-;; => nil  
+;; => nil
 
   (require '[clojure.string :as string])
-;; => nil  
+;; => nil
 
   (defn user-specs []
     (->> (s/registry)
-         keys   
+         keys
          (remove #(string/starts-with? (namespace %) "clojure"))))
 ;; => #'kth-clj-finance.aws/user-specs
 
@@ -208,7 +209,7 @@
                  (into {}))
      :components (openapi/->schemas (user-specs))})
 ;; => #'kth-clj-finance.aws/api
-  
+
   api
 ;; => {:openapi "3.0.0",
 ;;     :info {:title "KTH Bank API", :version "1.0"},
@@ -326,10 +327,10 @@
 ;;         "account-holder" {:type "string"},
 ;;         "date-opened" {:type "string"}},
 ;;        :required ["id" "account-holder" "date-opened"],
-;;        :title "account/account"}}}}  
-  
+;;        :title "account/account"}}}}
+
   (require '[cheshire.core :as json])
-;; => nil  
+;; => nil
 
   (apigw/import-rest-api :endpoint-configuration-types "REGIONAL"
                          :body (json/generate-string api))
@@ -340,7 +341,7 @@
 ;;     :version "1.0",
 ;;     :name "KTH Bank API",
 ;;     :id "ikt8aiuec5"}
-  
+
   (def api-id (->> (apigw/get-rest-apis)
                    :items
                    first
@@ -380,7 +381,7 @@
 ;;       :function-name "hello-lumo"}]}
 
   (require '[amazonica.aws.s3 :as s3])
-;; => nil  
+;; => nil
 
   (s3/list-buckets)
 ;; => [{:creation-date
@@ -424,11 +425,11 @@
 ;;      :name "www.jmglov.net",
 ;;      :owner
 ;;      {:display-name "jmglov",
-;;       :id "022d83ad6361dec3c93757e75c1c3a7982532ffdbf3bf87976490873591e2188"}}]  
+;;       :id "022d83ad6361dec3c93757e75c1c3a7982532ffdbf3bf87976490873591e2188"}}]
 
   (s3/put-object :bucket-name "misc.jmglov.net"
                  :key "kth-clj-finance/kth-clj-finance.jar"
-                 :file "target/kth-clj-finance.jar")  
+                 :file "target/kth-clj-finance.jar")
 ;; => {:version-id "kZ3B0p80z2U2459oa8CXdWuDozh2KMZs",
 ;;     :etag "d11f43745a1392c5383da30957770bc1",
 ;;     :requester-charged? false,
@@ -471,7 +472,7 @@
 ;;     :prefix "kth-clj-finance/"}
 
   (require '[amazonica.aws.lambda :as lambda])
-;; => nil  
+;; => nil
 
   (lambda/create-function :function-name "kth-clj-finance-apigw-handler"
                           :handler "apigw-handler"
@@ -527,7 +528,7 @@
 ;;      :timeout 10,
 ;;      :version "$LATEST",
 ;;      :handler "apigw-handler",
-;;      :function-name "kth-clj-finance-apigw-handler"}}  
+;;      :function-name "kth-clj-finance-apigw-handler"}}
 
   (def apigw-handler-function (get-in apigw-handler-lambda [:configuration :function-name]))
 ;; => #'kth-clj-finance.aws/apigw-handler-function
@@ -540,7 +541,7 @@
 ;;     #object[java.nio.HeapByteBuffer 0x43358b53 "java.nio.HeapByteBuffer[pos=0 lim=15 cap=15]"]}
 
   (require '[amazonica.aws.logs :as logs])
-;; => nil  
+;; => nil
 
   (logs/describe-log-groups)
 ;; => {:log-groups
@@ -578,7 +579,7 @@
 ;;       "49605473494938331280165799569383578905038459616761288226",
 ;;       :first-event-timestamp 1606650618447,
 ;;       :stored-bytes 0,
-;;       :creation-time 1606650627542}]}  
+;;       :creation-time 1606650627542}]}
 
   (logs/get-log-events :log-group-name "/aws/lambda/kth-clj-finance-apigw-handler"
                        :log-stream-name
@@ -624,7 +625,7 @@
      :paths (->> paths
                  (map (partial openapi/->path apigw-handler-function))
                  (into {}))
-     :components (openapi/->schemas (user-specs))})  
+     :components (openapi/->schemas (user-specs))})
 ;; => #'kth-clj-finance.aws/api
 
   api
@@ -769,9 +770,9 @@
 ;;         "date-opened" {:type "string"}},
 ;;        :required ["id" "account-holder" "date-opened"],
 ;;        :title "account/account"}}}}
-  
+
   (apigw/put-rest-api :rest-api-id api-id
-                      :body (json/generate-string api)) 
+                      :body (json/generate-string api))
 ;; => {:created-date
 ;;     #object[org.joda.time.DateTime 0x52b87d3d "2020-11-29T08:52:42.000+01:00"],
 ;;     :endpoint-configuration {:types ["EDGE"]},
@@ -781,7 +782,7 @@
 ;;     :id "ikt8aiuec5"}
 
   (require '[clj-http.client :as client])
-;; => nil  
+;; => nil
 
   (apigw/get-rest-apis)
 ;; => {:items
@@ -823,7 +824,7 @@
 ;;     #object[org.joda.time.DateTime 0x538c8fdd "2020-11-29T13:38:09.000+01:00"],
 ;;     :cache-cluster-status "NOT_AVAILABLE",
 ;;     :last-updated-date
-;;     #object[org.joda.time.DateTime 0x74ddb2e "2020-11-29T13:38:09.000+01:00"]}  
+;;     #object[org.joda.time.DateTime 0x74ddb2e "2020-11-29T13:38:09.000+01:00"]}
 
   (apigw/get-stage :rest-api-id (:id apigw)
                    :stage-name "api")
@@ -835,14 +836,14 @@
 ;;     #object[org.joda.time.DateTime 0x6398f59f "2020-11-29T13:38:09.000+01:00"],
 ;;     :cache-cluster-status "NOT_AVAILABLE",
 ;;     :last-updated-date
-;;     #object[org.joda.time.DateTime 0x3890381f "2020-11-29T13:38:09.000+01:00"]}  
+;;     #object[org.joda.time.DateTime 0x3890381f "2020-11-29T13:38:09.000+01:00"]}
 
   (def base-url (format "https://%s.execute-api.eu-west-1.amazonaws.com/api"
                         (:id apigw)))
 ;; => #'kth-clj-finance.aws/base-url
 
   (require '[clj-http.client :as http])
-;; => nil  
+;; => nil
 
   (http/get (str base-url "/accounts"))
 
@@ -887,8 +888,93 @@
                            :s3-bucket "misc.jmglov.net"
                            :s3-key "kth-clj-finance/kth-clj-finance.jar"})
 ;; => #'kth-clj-finance.aws/apigw-handler-code
-  
+
+  (s3/put-object :bucket-name "misc.jmglov.net"
+                 :key "kth-clj-finance/kth-clj-finance.jar"
+                 :file "target/kth-clj-finance.jar")
+;; => {:version-id "EUD3bMJR_J016mLypRcMMwbJZaJLSo_R",
+;;     :etag "138b8187ae1761dd2410f26a672ea93a",
+;;     :requester-charged? false,
+;;     :content-md5 "E4uBh64XYd0kEPJqZy6pOg==",
+;;     :metadata
+;;     {:content-disposition nil,
+;;      :expiration-time-rule-id nil,
+;;      :user-metadata nil,
+;;      :instance-length 0,
+;;      :version-id "EUD3bMJR_J016mLypRcMMwbJZaJLSo_R",
+;;      :server-side-encryption "AES256",
+;;      :server-side-encryption-aws-kms-key-id nil,
+;;      :etag "138b8187ae1761dd2410f26a672ea93a",
+;;      :last-modified nil,
+;;      :cache-control nil,
+;;      :http-expires-date nil,
+;;      :content-length 0,
+;;      :content-type nil,
+;;      :restore-expiration-time nil,
+;;      :content-encoding nil,
+;;      :expiration-time nil,
+;;      :content-md5 nil,
+;;      :ongoing-restore nil}}
+
   (lambda/update-function-code apigw-handler-code)
+;; => {:role "arn:aws:iam::289341159200:role/kth-clj-finance-apigw-handler",
+;;     :description "uploaded via amazonica",
+;;     :revision-id "828f44d8-3302-4861-9003-3e47bc8ffcbc",
+;;     :file-system-configs [],
+;;     :code-size 6088464,
+;;     :function-arn
+;;     "arn:aws:lambda:eu-west-1:289341159200:function:kth-clj-finance-apigw-handler",
+;;     :last-update-status "Successful",
+;;     :state "Active",
+;;     :last-modified "2020-11-29T13:24:10.390+0000",
+;;     :code-sha256 "PuNkInsbDaezUqU3yXo1Dg6wzB38+/1Bw3j//kyX+hE=",
+;;     :runtime "java11",
+;;     :memory-size 1024,
+;;     :layers [],
+;;     :tracing-config {:mode "PassThrough"},
+;;     :timeout 10,
+;;     :version "$LATEST",
+;;     :handler "apigw-handler",
+;;     :function-name "kth-clj-finance-apigw-handler"}
+
+  (apigw/create-deployment :rest-api-id (:id apigw)
+                           :stage-name "api")
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x392809c3 "2020-11-29T14:25:28.000+01:00"],
+;;     :id "kmw5tb"}
+
+  (http/get (str base-url "/accounts"))
+;; => {:cached nil,
+;;     :request-time 4081,
+;;     :repeatable? false,
+;;     :protocol-version {:name "HTTP", :major 1, :minor 1},
+;;     :streaming? true,
+;;     :http-client
+;;     #object[org.apache.http.impl.client.InternalHttpClient 0x1f0b439b "org.apache.http.impl.client.InternalHttpClient@1f0b439b"],
+;;     :chunked? false,
+;;     :reason-phrase "OK",
+;;     :headers
+;;     {"X-Cache" "Miss from cloudfront",
+;;      "x-amzn-RequestId" "7456dd52-b77b-4fc9-add7-ae1fbfde0cdd",
+;;      "Via" "1.1 a52c33748955378f279062b7fc7ef91e.cloudfront.net (CloudFront)",
+;;      "Content-Type" "application/json",
+;;      "Content-Length" "15",
+;;      "Connection" "close",
+;;      "x-amz-apigw-id" "WxZcjF4_DoEFoUQ=",
+;;      "X-Amz-Cf-Pop" "ARN54-C1",
+;;      "X-Amzn-Trace-Id" "Root=1-5fc3a2b6-3ef07ed71d2083d24baf015b;Sampled=0",
+;;      "Date" "Sun, 29 Nov 2020 13:31:38 GMT",
+;;      "X-Amz-Cf-Id" "e0l37yaXDy6bGhA2lJoZBfdrVC5H398iox1ro8xD4EH7tuOWhCJluA=="},
+;;     :orig-content-encoding nil,
+;;     :status 200,
+;;     :length 15,
+;;     :body "{\"accounts\":[]}",
+;;     :trace-redirects []}
+
+  (-> (http/get (str base-url "/accounts"))
+      :body
+      (json/parse-string true))
+;; => {:accounts []}
 
   (interleave (keys apigw-handler-code) (vals apigw-handler-code))
 ;; => (:function-name
@@ -897,11 +983,11 @@
 ;;     "misc.jmglov.net"
 ;;     :s3-key
 ;;     "kth-clj-finance/kth-clj-finance.jar")
-  
+
   (defn apply-map [f m]
     (->> (interleave (keys m) (vals m))
          (apply f)))
-;; => #'kth-clj-finance.aws/apply-map  
+;; => #'kth-clj-finance.aws/apply-map
 
   (apply-map lambda/update-function-code apigw-handler-code)
 ;; => {:role "arn:aws:iam::289341159200:role/kth-clj-finance-apigw-handler",
@@ -922,6 +1008,6 @@
 ;;     :timeout 10,
 ;;     :version "$LATEST",
 ;;     :handler "apigw-handler",
-;;     :function-name "kth-clj-finance-apigw-handler"}  
-  
+;;     :function-name "kth-clj-finance-apigw-handler"}
+
   )
