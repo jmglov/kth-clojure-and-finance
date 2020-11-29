@@ -976,38 +976,43 @@
       (json/parse-string true))
 ;; => {:accounts []}
 
-  (interleave (keys apigw-handler-code) (vals apigw-handler-code))
-;; => (:function-name
-;;     "kth-clj-finance-apigw-handler"
-;;     :s3-bucket
-;;     "misc.jmglov.net"
-;;     :s3-key
-;;     "kth-clj-finance/kth-clj-finance.jar")
+  (require '[clojure.spec.gen.alpha :as sgen])
+;; => nil
 
-  (defn apply-map [f m]
-    (->> (interleave (keys m) (vals m))
-         (apply f)))
-;; => #'kth-clj-finance.aws/apply-map
+  (sgen/generate (s/gen :account/create-request))
+;; => {:account-holder "YyqTWPNREH6WTf"}
 
-  (apply-map lambda/update-function-code apigw-handler-code)
-;; => {:role "arn:aws:iam::289341159200:role/kth-clj-finance-apigw-handler",
-;;     :description "uploaded via amazonica",
-;;     :revision-id "25c7b273-0164-49bb-a6d3-920a78e24e47",
-;;     :file-system-configs [],
-;;     :code-size 6081430,
-;;     :function-arn
-;;     "arn:aws:lambda:eu-west-1:289341159200:function:kth-clj-finance-apigw-handler",
-;;     :last-update-status "Successful",
-;;     :state "Active",
-;;     :last-modified "2020-11-29T11:45:40.190+0000",
-;;     :code-sha256 "vSsbJtOI+Z98FK/bLUuGGpT0mmaZqyG6x74XdMhQMKI=",
-;;     :runtime "java11",
-;;     :memory-size 1024,
-;;     :layers [],
-;;     :tracing-config {:mode "PassThrough"},
-;;     :timeout 10,
-;;     :version "$LATEST",
-;;     :handler "apigw-handler",
-;;     :function-name "kth-clj-finance-apigw-handler"}
+  (http/post (str base-url "/accounts")
+             {:content-type :json
+              :body (-> (sgen/generate (s/gen :account/create-request))
+                        json/generate-string)})
+
+  (defn deploy-lambda []
+    (s3/put-object :bucket-name "misc.jmglov.net"
+                   :key "kth-clj-finance/kth-clj-finance.jar"
+                   :file "target/kth-clj-finance.jar")
+    (lambda/update-function-code apigw-handler-code)
+    (apigw/create-deployment :rest-api-id (:id apigw)
+                             :stage-name "api"))
+;; => #'kth-clj-finance.aws/deploy-lambda
+
+  (deploy-lambda)
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x2495b0c6 "2020-11-29T14:58:10.000+01:00"],
+;;     :id "4iu2o2"}
+
+  (-> (http/post (str base-url "/accounts")
+                 {:content-type :json
+                  :body (-> (sgen/generate (s/gen :account/create-request))
+                            json/generate-string)})
+      :body
+      (json/parse-string true))
+;; => {:id "1314693",
+;;     :account-holder "R13DXAr317A6g816wjFx6jE1g5NA9n",
+;;     :date-opened "2020-11-29T13:59:42.041854Z"}
+
+  (-> (http/get (str base-url "/accounts/1314693"))
+      :body
+      (json/parse-string true))
 
   )
