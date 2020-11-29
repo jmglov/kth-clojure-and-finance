@@ -3,6 +3,8 @@
             [clojure.java.io :as io]
             [kth-clj-finance.accounts :as accounts]
             [kth-clj-finance.db :as db])
+  (:import (java.time Instant)
+           (java.util UUID))
   (:gen-class :name apigw-handler
               :main false
               :implements [com.amazonaws.services.lambda.runtime.RequestStreamHandler]))
@@ -30,12 +32,28 @@
     (log (str "Getting account id: " id))
     (db/get-account id)))
 
+(defn create-transfer [{:keys [body pathParameters]}]
+  (let [{:keys [credit-account amount]} body
+        debit-account (:id pathParameters)
+        _ (log (format "Transferring %d from account %s to account %s"
+                       amount debit-account credit-account))
+        transfer {:id (str (UUID/randomUUID))
+                  :debit-account debit-account
+                  :credit-account credit-account
+                  :amount amount
+                  :date (str (Instant/now))}]
+    (db/put-transfer transfer)
+    (log "Transfer created" transfer)
+    transfer))
+
 (def handlers
   {"/accounts"
    {"GET" list-accounts
     "POST" create-account}
    "/accounts/{id}"
-   {"GET" get-account}})
+   {"GET" get-account}
+   "/accounts/{id}/transfer"
+   {"POST" create-transfer}})
 
 (defn parse-body [{:keys [body] :as event}]
   (if body

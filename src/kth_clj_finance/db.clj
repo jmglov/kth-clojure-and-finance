@@ -15,3 +15,7 @@
 (defn put-account [account]
   (dynamo/put-item :table-name table-name
                    :item account))
+
+(defn put-transfer [transfer]
+  (dynamo/put-item :table-name table-name
+                   :item transfer))

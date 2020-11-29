@@ -121,6 +121,9 @@
              :response :???}}})
 ;; => #'kth-clj-finance.aws/paths
 
+  (s/def :transfer/id string?)
+;; => :transfer/id
+
   (s/def :transfer/debit-account :account/id)
 ;; => :transfer/debit-account
 
@@ -130,9 +133,15 @@
   (s/def :transfer/amount pos-int?)
 ;; => :transfer/amount
 
-  (s/def :transfer/transfer (s/keys :req-un [:transfer/debit-account
+  (s/def :transfer/date (s/and string?
+                               (partial re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z")))
+;; => :transfer/date
+
+  (s/def :transfer/transfer (s/keys :req-un [:transfer/id
+                                             :transfer/debit-account
                                              :transfer/credit-account
-                                             :transfer/amount]))
+                                             :transfer/amount
+                                             :transfer/date]))
 ;; => :transfer/transfer
 
   (s/def :transfer/request (s/keys :req-un [:transfer/credit-account
@@ -1210,5 +1219,99 @@
 
   (s/valid? :accounts/list *1)
 ;; => true
+
+  paths
+;; => {"/accounts"
+;;     {:post
+;;      {:summary "Create an account",
+;;       :request :account/create-request,
+;;       :response :account/account},
+;;      :get {:summary "List accounts", :response :accounts/list}},
+;;     "/accounts/{id}"
+;;     {:get
+;;      {:summary "Get account info",
+;;       :parameter :account/id,
+;;       :response :account/account}},
+;;     "/accounts/{id}/transfer"
+;;     {:post
+;;      {:summary "Transfer from this account to another",
+;;       :parameter :account/id,
+;;       :request :transfer/request,
+;;       :response :transfer/transfer}}}
+
+  (generate :transfer/request)
+;; => {:credit-account "9518566", :amount 129490}
+
+  (generate :transfer/transfer)
+
+  (s/def :date/iso8601
+    (s/with-gen
+      (s/and string?
+             (partial re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z"))
+      #(sgen/return (str (Instant/now)))))
+;; => :date/iso8601  
+
+  (s/def :account/date-opened :date/iso8601)
+;; => :account/date-opened
+
+  (s/def :transfer/date :date/iso8601)
+;; => :transfer/date
+
+  (generate :transfer/transfer)
+;; => {:id "5U1gNU6H",
+;;     :debit-account "7674925",
+;;     :credit-account "9805084",
+;;     :amount 7439761,
+;;     :date "2020-11-29T15:21:03.558620Z"}
+
+  (handler/create-transfer {:pathParameters {:id "9453577"}
+                            :body {:credit-account "8130445"
+                                   :amount 4200}})
+;; => {:id "9bd39b48-8578-4b32-baab-05054be00f20",
+;;     :debit-account "9453577",
+;;     :credit-account "8130445",
+;;     :amount 4200,
+;;     :date "2020-11-29T15:28:11.754935Z"}
+
+  (handler/list-accounts {})
+;; => {:accounts
+;;     [{:date-opened "2020-11-29T14:35:18.598211Z",
+;;       :id "9453577",
+;;       :account-holder "g99E9fiId81drC1CtDcg5Olav9x"}
+;;      {:date-opened "2020-11-29T14:28:18.092858Z",
+;;       :id "5368778",
+;;       :account-holder "6WebQ1PT"}
+;;      {:date-opened "2020-11-29T14:51:28.285931Z",
+;;       :id "9984638",
+;;       :account-holder "iwo63xpG6mEu7IN7FCK2"}
+;;      {:date-opened "2020-11-29T14:35:43.137406Z",
+;;       :id "8130445",
+;;       :account-holder "tA9gw"}
+;;      {:date-opened "2020-11-29T14:36:31.229388Z",
+;;       :id "7771557",
+;;       :account-holder "xRlY93lFX"}
+;;      {:date "2020-11-29T15:28:11.754935Z",
+;;       :amount 4200,
+;;       :debit-account "9453577",
+;;       :id "9bd39b48-8578-4b32-baab-05054be00f20",
+;;       :credit-account "8130445"}]}
+
+  (deploy-lambda)
+;; => {:created-date
+;;     #object[org.joda.time.DateTime 0x1f03650e "2020-11-29T16:30:18.000+01:00"],
+;;     :id "ytc1fe"}
+
+  (-> (http/post (str base-url "/accounts/9453577/transfer")
+                 {:content-type :json
+                  :body (-> (sgen/generate (s/gen :transfer/request))
+                            json/generate-string)})
+      :body
+      (json/parse-string true))
+;; => {:id "cd4581b7-8829-4a6b-b577-510ab8ba1251",
+;;     :debit-account "9453577",
+;;     :credit-account "1806739",
+;;     :amount 874682,
+;;     :date "2020-11-29T15:31:46.002351Z"}
+
 
   )
