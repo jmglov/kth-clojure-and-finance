@@ -2,30 +2,23 @@
   (:require [amazonica.aws.dynamodbv2 :as dynamo]
             [clojure.string :as string]))
 
-(def table-name "kth-clj-finance")
+(def accounts-table "kth-clj-finance-accounts")
 
-(defn tag-item [type item]
-  (update item :id #(format "%s:%s" (string/upper-case (name type)) %)))
-
-(defn untag-item [item]
-  (update item :id string/replace-first #"[A-Z]+:" ""))
+(def ledger-table "kth-clj-finance-ledger")
 
 (defn get-account [id]
-  (->> (dynamo/get-item :table-name table-name
+  (->> (dynamo/get-item :table-name accounts-table
                         :key {:id {:s id}})
-       :item
-       untag-item))
+       :item))
 
 (defn list-accounts []
-  (->> (dynamo/scan :table-name table-name)
-       :items
-       (filter #(string/starts-with? (:id %) "ACCOUNT:"))
-       (map untag-item)))
+  (->> (dynamo/scan :table-name accounts-table)
+       :items))
 
 (defn put-account [account]
-  (dynamo/put-item :table-name table-name
-                   :item (tag-item :account account)))
+  (dynamo/put-item :table-name accounts-table
+                   :item account))
 
 (defn put-transfer [transfer]
-  (dynamo/put-item :table-name table-name
-                   :item (tag-item :transfer transfer)))
+  (dynamo/put-item :table-name ledger-table
+                   :item transfer))
