@@ -1,9 +1,4 @@
-(ns kth-clj-finance.aws
-  (:require [clojure.string :as string]
-            [cheshire.core :as json]
-            [kth-clj-finance.accounts :as accounts]
-            [amazonica.aws.dynamodbv2 :as dynamo]
-            [kth-clj-finance.db :as db]))
+(ns kth-clj-finance.aws)
 
 ;; 21st century banking, please!
 (comment
@@ -46,9 +41,6 @@
   (s/def :account/id (s/and string?
                             (partial re-matches #"[0-9]{7}")))
 ;; => :account/id
-
-  (require '[kth-clj-finance.accounts :as accounts])
-;; => nil
 
   (s/valid? :account/id (accounts/new-account-number))
 ;; => true
@@ -483,9 +475,6 @@
 ;;     :key-count 1,
 ;;     :prefix "kth-clj-finance/"}
 
-  (require '[amazonica.aws.lambda :as lambda])
-;; => nil
-
   (lambda/create-function :function-name "kth-clj-finance-apigw-handler"
                           :handler "apigw-handler"
                           :runtime "java11"
@@ -792,9 +781,6 @@
 ;;     :version "1.0",
 ;;     :name "KTH Bank API",
 ;;     :id "ikt8aiuec5"}
-
-  (require '[clj-http.client :as client])
-;; => nil
 
   (apigw/get-rest-apis)
 ;; => {:items

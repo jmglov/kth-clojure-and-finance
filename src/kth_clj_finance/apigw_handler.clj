@@ -37,11 +37,12 @@
         debit-account (:id pathParameters)
         _ (log (format "Transferring %d from account %s to account %s"
                        amount debit-account credit-account))
-        transfer {:id (str (UUID/randomUUID))
+        tx-date (Instant/now)
+        transfer {:id (format "%s|%s" tx-date (UUID/randomUUID))
                   :debit-account debit-account
                   :credit-account credit-account
                   :amount amount
-                  :date (str (Instant/now))}]
+                  :date (str tx-date)}]
     (db/put-transfer transfer)
     (log "Transfer created" transfer)
     transfer))
