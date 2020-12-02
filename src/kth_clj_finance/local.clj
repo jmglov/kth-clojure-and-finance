@@ -96,17 +96,17 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
   (import '(java.util UUID))
 ;; => java.util.UUID
 
-  (defn uuid []
+  (defn tx-id []
     (str (UUID/randomUUID)))
-;; => #'user/uuid
+;; => #'user/tx-id
 
   (defn execute-credit-transfer [debit-account credit-account amount]
     (let [tx-query "INSERT INTO transactions (id, account_id, amount) VALUES (?, ?, ?)"
           acct-query "UPDATE accounts SET balance = balance + ? WHERE id = ?"
           debit-amount (* amount -1)
           credit-amount amount]
-      (jdbc/execute-one! db [tx-query (uuid) debit-account debit-amount])
-      (jdbc/execute-one! db [tx-query (uuid) credit-account credit-amount])
+      (jdbc/execute-one! db [tx-query (tx-id) debit-account debit-amount])
+      (jdbc/execute-one! db [tx-query (tx-id) credit-account credit-amount])
       (jdbc/execute-one! db [acct-query debit-amount debit-account])
       (jdbc/execute-one! db [acct-query credit-amount credit-account])))
 ;; => #'user/execute-credit-transfer
@@ -121,23 +121,18 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
        :ACCOUNTS/ID)
 ;; => "3688295"  
 
-  (def ashley-id
-    (->> (jdbc/execute-one! db ["SELECT id FROM accounts WHERE account_holder = 'Ashley'"])
+  (defn account-id [holder]
+    (->> (jdbc/execute-one! db ["SELECT id FROM accounts WHERE account_holder = ?" holder])
          :ACCOUNTS/ID))
-;; => #'user/ashley-id
+;; => #'kth-clj-finance.local/account-id
 
-  (def kim-id
-    (->> (jdbc/execute-one! db ["SELECT id FROM accounts WHERE account_holder = 'Kim'"])
-         :ACCOUNTS/ID))
-;; => #'user/kim-id  
-
-  ashley-id
+  (account-id "Ashley")
 ;; => "3688295"
 
-  kim-id
+  (account-id "Kim")
 ;; => "7311890"
 
-  (execute-credit-transfer ashley-id kim-id 42)
+  (execute-credit-transfer (account-id "Ashley") (account-id "Kim") 42)
 ;; => #:next.jdbc{:update-count 1}
 
   (defn execute-one! [q]
@@ -169,7 +164,9 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
   (require '[clojure.spec.alpha :as s])
 ;; => nil
 
-  (s/def :account/id (s/and string? #(= 7 (count %))))
+  (s/def :account/id (s/and string?
+                            #(= 7 (count %))
+                            (partial re-matches #"[0-9]+")))
 ;; => :account/id
 
   (s/conform :account/id 1)
@@ -197,7 +194,32 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 
   (s/exercise-fn `execute-credit-transfer)
 
-  (s/def :account/id #{ashley-id kim-id})
+  (require '[clojure.spec.gen.alpha :as sgen])
+;; => nil
+
+  (sgen/generate (s/gen :account/id))
+
+  (sgen/generate (s/gen string?))
+;; => "zag4N18t2o4BbL6"
+
+  (count *1)
+;; => 15
+
+  (->> (repeatedly #(sgen/generate (s/gen string?)))
+       (take 10)
+       (map (juxt identity count)))
+;; => (["FPGLkf7f2WvD3wi61x1l4" 21]
+;;     ["miYC9tsk95432P32fX" 18]
+;;     ["a0n418vzrp7Wq4B6J" 17]
+;;     ["OdeX1FZai" 9]
+;;     ["778Tf6r56n28ncyovG" 18]
+;;     ["4qBBmG5VGj" 10]
+;;     ["p791d9Q7Z4ZV0H780Yk32kTb" 24]
+;;     ["FTx" 3]
+;;     ["p91dPTMN29zg262M2TJJ85M0n" 25]
+;;     ["20t93QIrrsh" 11])
+
+  (s/def :account/id #{(account-id "Ashley") (account-id "Kim")})
 ;; => :account/id
 
   (s/exercise-fn `execute-credit-transfer)
@@ -241,7 +263,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
                account-number]))
 ;; => #'user/list-transactions
 
-  (list-transactions ashley-id)
+  (list-transactions (account-id "Ashley"))
 ;; => [#:TRANSACTIONS{:ID "93292511-1fc1-4e6a-99e9-797a41b30a57",
 ;;                    :ACCOUNT_ID "6412469",
 ;;                    :AMOUNT -5,
@@ -305,7 +327,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
          :ACCOUNTS/BALANCE))
 ;; => #'user/get-balance
 
-  (get-balance ashley-id)
+  (get-balance (account-id "Ashley"))
 ;; => -48
 
   (defn get-balance
@@ -327,8 +349,17 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
   (def accounts (atom {}))
 ;; => #'user/accounts
 
-  (def ledger (atom []))
-;; => #'user/ledger
+  (s/def :account/account-holder string?)
+;; => :account/account-holder
+
+  (s/def :account/date-opened (s/and string?
+                                     (partial re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z")))
+;; => :account/date-opened
+
+  (s/def :account/account (s/keys :req-un [:account/id
+                                           :account/account-holder
+                                           :account/date-opened]))
+;; => :account/account
 
   (import '(java.time Instant))
 ;; => java.time.Instant  
@@ -348,15 +379,43 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;; => #'user/create-account
 
   (create-account "Ashley")
-;; => {"7295776" "Ashley",
-;;     "8380288"
+;; => {"8380288"
 ;;     {:id "8380288",
 ;;      :account-holder "Ashley",
 ;;      :date-opened "2020-11-22T16:09:49.737288Z"}}
 
+  (->> (vals *1)
+       first
+       (s/valid? :account/account))
+;; => false
+
+  (->> (vals @accounts)
+       first
+       (s/explain-data :account/account))
+;; => #:clojure.spec.alpha{:problems
+;;                         ({:path [:id],
+;;                           :pred #{(account-id "Ashley") (account-id "Kim")},
+;;                           :val "9459451",
+;;                           :via [:account/account :account/id],
+;;                           :in [:id]}),
+;;                         :spec :account/account,
+;;                         :value
+;;                         {:id "9459451",
+;;                          :account-holder "Ashley",
+;;                          :date-opened "2020-12-01T07:34:19.207358Z"}}
+
+  (s/def :account/id (s/and string?
+                            #(= 7 (count %))
+                            (partial re-matches #"[0-9]+")))
+;; => :account/id
+
+  (->> (vals @accounts)
+       first
+       (s/valid? :account/account))
+;; => true
+
   (create-account "Kim")
-;; => {"7295776" "Ashley",
-;;     "8380288"
+;; => {"8380288"
 ;;     {:id "8380288",
 ;;      :account-holder "Ashley",
 ;;      :date-opened "2020-11-22T16:09:49.737288Z"},
@@ -365,36 +424,30 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;      :account-holder "Kim",
 ;;      :date-opened "2020-11-22T16:10:04.948452Z"}}  
 
-  (defn get-account-number [account-holder]
+  (defn account-id [account-holder]
     (->> @accounts
          (some (fn [[id account]]
                  (= account-holder (:account-holder account))))))
-;; => #'user/get-account-number
+;; => #'user/account-id
 
-  (get-account-number "Kim")
+  (account-id "Kim")
 ;; => true
 
-  (defn get-account-number [account-holder]
+  (defn account-id [account-holder]
     (->> @accounts
          (some (fn [[id account]]
                  (and (= account-holder (:account-holder account))
                       id)))))
-;; => #'user/get-account-number
+;; => #'user/account-id
 
-  (get-account-number "Kim")
+  (account-id "Kim")
 ;; => "6489301"
 
-  (def kim-id (get-account-number "Kim"))
-;; => #'user/kim-id
-
-  (def ashley-id (get-account-number "Ashley"))
-;; => #'user/ashley-id
-
-  ashley-id
-;; => "8380288"
+  (def ledger (atom []))
+;; => #'user/ledger
 
   (defn execute-credit-transfer [debit-account credit-account amount]
-    (let [tx {:id (uuid)
+    (let [tx {:id (tx-id)
               :debit-account debit-account
               :credit-account credit-account
               :amount amount
@@ -403,7 +456,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
       tx))
 ;; => #'user/execute-credit-transfer
 
-  (execute-credit-transfer ashley-id kim-id 42)
+  (execute-credit-transfer (account-id "Ashley") (account-id "Kim") 42)
 ;; => [{:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
 ;;      :debit-account "8380288",
 ;;      :credit-account "6489301",
@@ -417,7 +470,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
                        (= account-number credit-account))))))
 ;; => #'user/list-transactions
 
-  (list-transactions ashley-id)
+  (list-transactions (account-id "Ashley"))
 ;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
 ;;      :debit-account "8380288",
 ;;      :credit-account "6489301",
@@ -436,12 +489,12 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
                                      amount)))))))
 ;; => #'user/list-transactions
 
-  (list-transactions ashley-id)
+  (list-transactions (account-id "Ashley"))
 ;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
 ;;      :date "2020-11-22T16:16:58.172085Z",
 ;;      :amount -42})
 
-  (s/def :account/id #{ashley-id kim-id})
+  (s/def :account/id #{(account-id "Ashley") (account-id "Kim")})
 ;; => :account/id
 
   (s/exercise-fn `execute-credit-transfer)
@@ -781,7 +834,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;        :amount 74,
 ;;        :date "2020-11-22T16:26:14.437684Z"}]])
 
-  (list-transactions ashley-id)
+  (list-transactions (account-id "Ashley"))
 ;; => ({:id "873ed4ab-cb45-438f-9ecc-e9105e1eda1c",
 ;;      :date "2020-11-22T16:16:58.172085Z",
 ;;      :amount -42}
@@ -822,10 +875,10 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;      :account-holder "Sam",
 ;;      :date-opened "2020-11-22T16:27:44.661525Z"}}
 
-  (def sam-id (get-account-number "Sam"))
-;; => #'user/sam-id
+  (account-id "Sam")
+;; => "4279525"
 
-  (s/def :account/id #{ashley-id kim-id sam-id})
+  (s/def :account/id #{(account-id "Ashley") (account-id "Kim") (account-id "Sam")})
 ;; => :account/id  
 
   (s/exercise-fn `execute-credit-transfer)
@@ -1665,7 +1718,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;        :amount 10,
 ;;        :date "2020-11-22T16:28:47.961143Z"}]])  
 
-  (list-transactions sam-id)
+  (list-transactions (account-id "Sam"))
 ;; => ({:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
 ;;      :date "2020-11-22T16:28:47.431042Z",
 ;;      :amount 2}
@@ -1698,7 +1751,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
       (transduce xf conj @ledger)))
 ;; => #'user/list-transactions  
 
-  (list-transactions sam-id)
+  (list-transactions (account-id "Sam"))
 ;; => [{:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
 ;;      :date "2020-11-22T16:28:47.431042Z",
 ;;      :amount 2}
@@ -1734,7 +1787,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
     (transduce (transaction-lister account-number) conj @ledger))
 ;; => #'user/list-transactions  
 
-  (list-transactions sam-id)
+  (list-transactions (account-id "Sam"))
 ;; => [{:id "a46d7f18-b9d2-44a8-8f97-b5de573937aa",
 ;;      :date "2020-11-22T16:28:47.431042Z",
 ;;      :amount 2}
@@ -1762,7 +1815,7 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
                 @ledger)))
 ;; => #'user/get-balance
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => -11
 
   (Instant/parse (now))
@@ -1792,17 +1845,17 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
                   @ledger))))
 ;; => #'user/get-balance
 
-  (execute-credit-transfer ashley-id sam-id 42)
+  (execute-credit-transfer (account-id "Ashley") (account-id "Sam") 42)
 ;; => {:id "fa2cfb1b-e633-4784-8599-3a832896c88a",
 ;;     :debit-account "8380288",
 ;;     :credit-account "3250090",
 ;;     :amount 42,
 ;;     :date "2020-11-22T17:03:32.299003Z"}
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => 115  
 
-  (get-balance sam-id "2020-11-22T17:00:00Z")
+  (get-balance (account-id "Sam") "2020-11-22T17:00:00Z")
 ;; => -11  
 
   ;; Let's make balance lookups faster!
@@ -1831,23 +1884,23 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
     (get @balances account-number))
 ;; => #'user/get-cached-balance
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => 115  
 
-  (get-cached-balance sam-id)
+  (get-cached-balance (account-id "Sam"))
 ;; => 115
 
-  (execute-credit-transfer sam-id ashley-id 5)
+  (execute-credit-transfer (account-id "Sam") (account-id "Ashley") 5)
 ;; => {:id "d79b67a8-7e2b-4cb5-938c-68b8f94aea13",
 ;;     :debit-account "3250090",
 ;;     :credit-account "8380288",
 ;;     :amount 5,
 ;;     :date "2020-11-22T17:15:54.994817Z"}  
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => 110
 
-  (get-cached-balance sam-id)
+  (get-cached-balance (account-id "Sam"))
 ;; => 115
 
   ((fnil - 0) 20)
@@ -1998,13 +2051,13 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
   (update-balances)
 ;; => {"7295776" 0, "8380288" -147, "6489301" -42, "3250090" 90}  
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => 90
 
-  (get-cached-balance sam-id)
+  (get-cached-balance (account-id "Sam"))
 ;; => 90
 
-  (execute-credit-transfer sam-id ashley-id 45)  
+  (execute-credit-transfer (account-id "Sam") (account-id "Ashley") 45)  
 ;; => {:id "b26f8b3a-740f-4a18-9ab6-170bb9434cc6",
 ;;     :debit-account "3250090",
 ;;     :credit-account "8380288",
@@ -2012,10 +2065,10 @@ INSERT INTO accounts (id, account_holder) VALUES (?, ?)
 ;;     :date "2020-11-22T17:25:24.098911Z"}
 
 
-  (get-balance sam-id)
+  (get-balance (account-id "Sam"))
 ;; => 45
 
-  (get-cached-balance sam-id)
+  (get-cached-balance (account-id "Sam"))
 ;; => 45
 
   )
